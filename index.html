@@ -563,6 +563,24 @@
         }
       }
 
+      function prefersImageDecoder() {
+        const userAgent = navigator.userAgent || "";
+        const platform = navigator.platform || "";
+        const touchPoints = navigator.maxTouchPoints || 0;
+        const isAppleMobileDevice =
+          /iPad|iPhone|iPod/i.test(userAgent) || (platform === "MacIntel" && touchPoints > 1);
+
+        return isAppleMobileDevice;
+      }
+
+      function getSourceWidth(source) {
+        return source.width || source.videoWidth || source.naturalWidth || 0;
+      }
+
+      function getSourceHeight(source) {
+        return source.height || source.videoHeight || source.naturalHeight || 0;
+      }
+
       function formatAgo(seconds) {
         if (seconds <= 1) {
           return "Az once guncellendi.";
@@ -581,7 +599,7 @@
           this.card = card;
           this.url = card.dataset.streamUrl;
           this.canvas = card.querySelector("[data-stream-canvas]");
-          this.context = this.canvas.getContext("2d", { alpha: false, desynchronized: true });
+          this.context = this.canvas.getContext("2d", { alpha: false }) || this.canvas.getContext("2d");
           this.overlay = card.querySelector("[data-overlay]");
           this.status = card.querySelector("[data-status]");
           this.meta = card.querySelector("[data-meta]");
@@ -605,6 +623,8 @@
           this.minFrameInterval = 1000 / this.maxFps;
           this.initialFrameTimeout = 20000;
           this.liveFrameTimeout = 5000;
+          this.decoderMode = prefersImageDecoder() ? "image" : "bitmap";
+          this.decodeFailureCount = 0;
         }
 
         start() {
@@ -858,43 +878,153 @@
         }
 
         async decodeAndDraw(blob, attemptId) {
-          let bitmap = null;
+          let decodedFrame = null;
 
           try {
-            bitmap = await createImageBitmap(blob);
+            decodedFrame = await this.decodeFrame(blob);
           } catch (error) {
-            closeBitmap(bitmap);
+            this.handleDecodeFailure(error);
             this.finishRender(attemptId);
             return;
           }
 
           if (attemptId !== this.attemptId) {
-            closeBitmap(bitmap);
+            this.releaseDecodedFrame(decodedFrame);
             this.finishRender(attemptId);
             return;
           }
 
           window.requestAnimationFrame(() => {
             if (attemptId !== this.attemptId) {
-              closeBitmap(bitmap);
+              this.releaseDecodedFrame(decodedFrame);
               this.finishRender(attemptId);
               return;
             }
 
             try {
-              this.drawBitmapToCanvas(bitmap);
+              this.drawSourceToCanvas(decodedFrame.source);
               this.lastPresentedAt = performance.now();
+              this.decodeFailureCount = 0;
               this.card.classList.add("has-frame");
               this.setState("live", "Canli akis suruyor.");
               this.overlay.classList.add("is-hidden");
             } finally {
-              closeBitmap(bitmap);
+              this.releaseDecodedFrame(decodedFrame);
               this.finishRender(attemptId);
             }
           });
         }
 
-        drawBitmapToCanvas(bitmap) {
+        async decodeFrame(blob) {
+          if (this.decoderMode === "image") {
+            return this.decodeWithImage(blob);
+          }
+
+          try {
+            return await this.decodeWithBitmap(blob);
+          } catch (error) {
+            this.decoderMode = "image";
+            return this.decodeWithImage(blob);
+          }
+        }
+
+        async decodeWithBitmap(blob) {
+          if (typeof createImageBitmap !== "function") {
+            throw new Error("Bitmap decoder kullanilamiyor");
+          }
+
+          const bitmap = await createImageBitmap(blob);
+          return { kind: "bitmap", source: bitmap };
+        }
+
+        decodeWithImage(blob) {
+          const objectUrl = URL.createObjectURL(blob);
+
+          return new Promise((resolve, reject) => {
+            const image = new Image();
+            let settled = false;
+
+            const cleanup = () => {
+              image.onload = null;
+              image.onerror = null;
+            };
+
+            const succeed = () => {
+              if (settled) {
+                return;
+              }
+
+              settled = true;
+              cleanup();
+              resolve({ kind: "image", source: image, objectUrl });
+            };
+
+            const fail = (error) => {
+              if (settled) {
+                return;
+              }
+
+              settled = true;
+              cleanup();
+              URL.revokeObjectURL(objectUrl);
+              reject(error);
+            };
+
+            image.onload = () => {
+              succeed();
+            };
+
+            image.onerror = () => {
+              fail(new Error("Image load failed"));
+            };
+
+            image.src = objectUrl;
+
+            if (typeof image.decode === "function") {
+              image.decode().then(() => {
+                succeed();
+              }).catch(() => {
+                if (image.complete && image.naturalWidth > 0) {
+                  succeed();
+                }
+              });
+            }
+          });
+        }
+
+        releaseDecodedFrame(decodedFrame) {
+          if (!decodedFrame) {
+            return;
+          }
+
+          if (decodedFrame.kind === "bitmap") {
+            closeBitmap(decodedFrame.source);
+            return;
+          }
+
+          if (decodedFrame.source) {
+            decodedFrame.source.onload = null;
+            decodedFrame.source.onerror = null;
+          }
+
+          if (decodedFrame.objectUrl) {
+            URL.revokeObjectURL(decodedFrame.objectUrl);
+          }
+        }
+
+        handleDecodeFailure() {
+          this.decodeFailureCount += 1;
+
+          if (!this.hasFrame) {
+            this.meta.textContent = "Goruntu bekleniyor...";
+          }
+        }
+
+        drawSourceToCanvas(source) {
+          if (!this.context) {
+            return;
+          }
+
           const rect = this.canvas.getBoundingClientRect();
           const cssWidth = Math.max(1, Math.round(rect.width));
           const cssHeight = Math.max(1, Math.round(rect.height));
@@ -907,8 +1037,12 @@
             this.canvas.height = targetHeight;
           }
 
-          const sourceWidth = bitmap.width;
-          const sourceHeight = bitmap.height;
+          const sourceWidth = getSourceWidth(source);
+          const sourceHeight = getSourceHeight(source);
+          if (!sourceWidth || !sourceHeight) {
+            return;
+          }
+
           const sourceRatio = sourceWidth / sourceHeight;
           const targetRatio = targetWidth / targetHeight;
 
@@ -926,7 +1060,7 @@
           }
 
           this.context.imageSmoothingEnabled = true;
-          this.context.drawImage(bitmap, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
+          this.context.drawImage(source, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
         }
 
         finishRender(attemptId) {
