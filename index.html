@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
+    />
+    <title>Izmir Canli Trafik Izleme</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg-base: #06111b;
+        --bg-surface: rgba(8, 18, 30, 0.72);
+        --bg-surface-strong: rgba(8, 18, 30, 0.9);
+        --bg-card: linear-gradient(180deg, rgba(16, 32, 48, 0.92), rgba(9, 18, 31, 0.94));
+        --text-primary: #f8fbff;
+        --text-muted: rgba(225, 236, 248, 0.72);
+        --line-soft: rgba(156, 194, 224, 0.18);
+        --accent-warm: #ff8c42;
+        --accent-cool: #50c5ff;
+        --accent-live: #8dff8b;
+        --shadow-deep: 0 24px 80px rgba(0, 0, 0, 0.42);
+        --radius-xl: 32px;
+        --radius-lg: 24px;
+        --radius-md: 18px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+
+      body {
+        min-height: 100dvh;
+        font-family: "Sora", "Avenir Next", "Segoe UI", sans-serif;
+        color: var(--text-primary);
+        background:
+          radial-gradient(circle at top left, rgba(80, 197, 255, 0.26), transparent 34%),
+          radial-gradient(circle at top right, rgba(255, 140, 66, 0.24), transparent 32%),
+          linear-gradient(160deg, #051019 0%, #0a1724 48%, #071521 100%);
+        overflow-x: hidden;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: 56px 56px;
+        mask-image: radial-gradient(circle at center, black 44%, transparent 92%);
+        pointer-events: none;
+        opacity: 0.32;
+      }
+
+      .page-shell {
+        position: relative;
+        width: min(100%, 1180px);
+        margin: 0 auto;
+        padding: 20px 16px 40px;
+      }
+
+      .ambient {
+        position: fixed;
+        z-index: -1;
+        filter: blur(28px);
+        opacity: 0.56;
+        pointer-events: none;
+      }
+
+      .ambient-one {
+        width: 240px;
+        height: 240px;
+        top: -32px;
+        right: -54px;
+        border-radius: 42% 58% 62% 38%;
+        background: linear-gradient(135deg, rgba(255, 140, 66, 0.5), rgba(255, 214, 83, 0.12));
+      }
+
+      .ambient-two {
+        width: 220px;
+        height: 220px;
+        bottom: 18%;
+        left: -84px;
+        border-radius: 58% 42% 46% 54%;
+        background: linear-gradient(135deg, rgba(80, 197, 255, 0.4), rgba(80, 197, 255, 0.08));
+      }
+
+      .hero {
+        position: relative;
+        margin-bottom: 20px;
+        padding: 18px 4px 10px;
+      }
+
+      .hero-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border: 1px solid rgba(141, 255, 139, 0.24);
+        border-radius: 999px;
+        background: rgba(8, 18, 30, 0.56);
+        color: rgba(214, 255, 213, 0.92);
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .hero-kicker::before {
+        content: "";
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--accent-live);
+        box-shadow: 0 0 0 0 rgba(141, 255, 139, 0.5);
+        animation: pulse 1.8s infinite;
+      }
+
+      .hero h1 {
+        margin: 18px 0 10px;
+        font-size: clamp(2rem, 8vw, 4.2rem);
+        line-height: 0.96;
+        letter-spacing: -0.06em;
+      }
+
+      .hero h1 span {
+        display: block;
+        color: transparent;
+        background: linear-gradient(120deg, #ffffff 16%, #8ddbff 52%, #ffba8b 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+      }
+
+      .hero p {
+        max-width: 640px;
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 0.98rem;
+        line-height: 1.65;
+      }
+
+      .camera-grid {
+        display: grid;
+        gap: 16px;
+      }
+
+      .camera-card {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius-xl);
+        background: var(--bg-card);
+        box-shadow: var(--shadow-deep);
+        isolation: isolate;
+      }
+
+      .camera-card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(circle at top right, rgba(255, 140, 66, 0.12), transparent 36%),
+          linear-gradient(160deg, transparent 0%, rgba(80, 197, 255, 0.07) 100%);
+        pointer-events: none;
+      }
+
+      .card-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 18px 18px 14px;
+      }
+
+      .card-title-wrap {
+        display: grid;
+        gap: 8px;
+      }
+
+      .card-label {
+        color: rgba(180, 204, 226, 0.72);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .card-title {
+        margin: 0;
+        font-size: clamp(1.22rem, 4vw, 1.6rem);
+        line-height: 1.15;
+        letter-spacing: -0.04em;
+      }
+
+      .card-chip {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(80, 197, 255, 0.22);
+        background: rgba(8, 18, 30, 0.56);
+        color: rgba(198, 233, 255, 0.9);
+        font-size: 0.76rem;
+        font-weight: 700;
+      }
+
+      .card-chip::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--accent-cool);
+        box-shadow: 0 0 20px rgba(80, 197, 255, 0.6);
+      }
+
+      .stream-stage {
+        position: relative;
+        margin: 0 18px;
+        aspect-ratio: 16 / 11;
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        isolation: isolate;
+        background:
+          linear-gradient(180deg, rgba(3, 11, 19, 0.56), rgba(3, 11, 19, 0.76)),
+          linear-gradient(135deg, rgba(6, 16, 27, 0.92), rgba(14, 27, 41, 0.96));
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .stream-stage::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(135deg, transparent 0%, rgba(255, 255, 255, 0.05) 50%, transparent 100%);
+        pointer-events: none;
+      }
+
+      .stream-canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        transform: translateZ(0) scale(1.01);
+        backface-visibility: hidden;
+        opacity: 1;
+        pointer-events: none;
+      }
+
+      .stream-overlay {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        padding: 18px;
+        text-align: center;
+        background:
+          linear-gradient(180deg, rgba(4, 10, 18, 0.32), rgba(4, 10, 18, 0.86)),
+          radial-gradient(circle at center, rgba(80, 197, 255, 0.12), transparent 60%);
+        backdrop-filter: blur(10px);
+        color: rgba(240, 247, 255, 0.94);
+        font-size: 1rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        transition: opacity 220ms ease, visibility 220ms ease;
+      }
+
+      .stream-overlay.is-hidden {
+        opacity: 0;
+        visibility: hidden;
+      }
+
+      .stream-overlay::before {
+        content: "";
+        width: 58px;
+        height: 58px;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        margin-bottom: 14px;
+        animation: shimmer 1.4s infinite ease-in-out;
+      }
+
+      .stream-overlay span {
+        display: block;
+        max-width: 220px;
+      }
+
+      .card-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 16px 18px 18px;
+      }
+
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: var(--bg-surface);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        font-size: 0.82rem;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .status-badge::before {
+        content: "";
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: currentColor;
+        box-shadow: 0 0 18px currentColor;
+      }
+
+      .status-badge[data-state="loading"] {
+        color: #ffcc79;
+      }
+
+      .status-badge[data-state="live"] {
+        color: var(--accent-live);
+      }
+
+      .status-badge[data-state="reconnecting"] {
+        color: var(--accent-cool);
+      }
+
+      .status-meta {
+        color: var(--text-muted);
+        font-size: 0.84rem;
+        line-height: 1.45;
+        text-align: right;
+      }
+
+      .fallback-note {
+        margin-top: 18px;
+        color: rgba(190, 211, 231, 0.66);
+        font-size: 0.82rem;
+        line-height: 1.6;
+      }
+
+      noscript {
+        display: block;
+        padding: 12px 16px;
+        margin: 0 0 16px;
+        border: 1px solid rgba(255, 140, 66, 0.24);
+        border-radius: 18px;
+        background: rgba(38, 18, 8, 0.74);
+        color: rgba(255, 224, 207, 0.94);
+      }
+
+      @media (min-width: 820px) {
+        .page-shell {
+          padding: 28px 22px 56px;
+        }
+
+        .camera-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 20px;
+        }
+
+        .hero {
+          margin-bottom: 28px;
+          padding-top: 28px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation: none !important;
+          transition: none !important;
+          scroll-behavior: auto !important;
+        }
+      }
+
+      @keyframes pulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(141, 255, 139, 0.5);
+        }
+
+        75% {
+          box-shadow: 0 0 0 10px rgba(141, 255, 139, 0);
+        }
+
+        100% {
+          box-shadow: 0 0 0 0 rgba(141, 255, 139, 0);
+        }
+      }
+
+      @keyframes shimmer {
+        0%,
+        100% {
+          transform: translateY(0);
+          opacity: 0.82;
+        }
+
+        50% {
+          transform: translateY(-3px);
+          opacity: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
+
+    <div class="page-shell">
+      <noscript>Canli kameralarin gorunebilmesi icin JavaScript etkin olmali.</noscript>
+
+      <header class="hero">
+        <div class="hero-kicker">Canli Akis</div>
+        <h1>
+          <span>Izmir MOBESE</span>
+          <span>Mobil Izleme Paneli</span>
+        </h1>
+        <p>
+          Akislar sayfa acilir acilmaz calisir. Bir kamera 5 saniye boyunca veri akitmazsa sadece o
+          kaynaga yeniden baglanilir; tum sayfa yenilenmez.
+        </p>
+      </header>
+
+      <main class="camera-grid">
+        <article
+          class="camera-card"
+          data-stream-card
+          data-stream-url="https://izum-cams.izmir.bel.tr/mjpeg/dc6abc36-4a0b-4780-9e8b-4d67eb5ec60b"
+        >
+          <div class="card-header">
+            <div class="card-title-wrap">
+              <div class="card-label">Izmir Trafik Kamerasi</div>
+              <h2 class="card-title">Anadolu Caddesi</h2>
+            </div>
+            <div class="card-chip">MOBESE</div>
+          </div>
+
+          <div class="stream-stage">
+            <canvas
+              class="stream-canvas"
+              data-stream-canvas
+              role="img"
+              aria-label="Anadolu Caddesi canli kamera goruntusu"
+            ></canvas>
+            <div class="stream-overlay" data-overlay>
+              <span>Yukleniyor</span>
+            </div>
+          </div>
+
+          <div class="card-footer">
+            <div class="status-badge" data-status data-state="loading">Yukleniyor</div>
+            <div class="status-meta" data-meta>Baglanti kuruluyor...</div>
+          </div>
+        </article>
+
+        <article
+          class="camera-card"
+          data-stream-card
+          data-stream-url="https://izum-cams.izmir.bel.tr/mjpeg/4e8211b9-f36e-4b7a-9a1c-8a89cff673c8"
+        >
+          <div class="card-header">
+            <div class="card-title-wrap">
+              <div class="card-label">Izmir Trafik Kamerasi</div>
+              <h2 class="card-title">Ordu Bulvari</h2>
+            </div>
+            <div class="card-chip">MOBESE</div>
+          </div>
+
+          <div class="stream-stage">
+            <canvas
+              class="stream-canvas"
+              data-stream-canvas
+              role="img"
+              aria-label="Ordu Bulvari canli kamera goruntusu"
+            ></canvas>
+            <div class="stream-overlay" data-overlay>
+              <span>Yukleniyor</span>
+            </div>
+          </div>
+
+          <div class="card-footer">
+            <div class="status-badge" data-status data-state="loading">Yukleniyor</div>
+            <div class="status-meta" data-meta>Baglanti kuruluyor...</div>
+          </div>
+        </article>
+      </main>
+
+      <p class="fallback-note">
+        Not: Akis denetimi tarayici tarafinda yapilir ve kesinti algilandiginda sadece ilgili kamera
+        baglantisi yeniden kurulur.
+      </p>
+    </div>
+
+    <script>
+      const textEncoder = new TextEncoder();
+      const headerSeparator = textEncoder.encode("\r\n\r\n");
+
+      function concatBytes(left, right) {
+        const result = new Uint8Array(left.length + right.length);
+        result.set(left, 0);
+        result.set(right, left.length);
+        return result;
+      }
+
+      function indexOfSequence(source, sequence, start = 0) {
+        outer: for (let i = start; i <= source.length - sequence.length; i += 1) {
+          for (let j = 0; j < sequence.length; j += 1) {
+            if (source[i + j] !== sequence[j]) {
+              continue outer;
+            }
+          }
+
+          return i;
+        }
+
+        return -1;
+      }
+
+      function trimCrlf(bytes) {
+        let start = 0;
+        let end = bytes.length;
+
+        while (start < end && (bytes[start] === 10 || bytes[start] === 13)) {
+          start += 1;
+        }
+
+        while (end > start && (bytes[end - 1] === 10 || bytes[end - 1] === 13)) {
+          end -= 1;
+        }
+
+        return bytes.subarray(start, end);
+      }
+
+      function decodeAscii(bytes) {
+        return String.fromCharCode(...bytes);
+      }
+
+      function closeBitmap(bitmap) {
+        if (bitmap && typeof bitmap.close === "function") {
+          bitmap.close();
+        }
+      }
+
+      function formatAgo(seconds) {
+        if (seconds <= 1) {
+          return "Az once guncellendi.";
+        }
+
+        if (seconds < 60) {
+          return `Son kare ${seconds} sn once alindi.`;
+        }
+
+        const minutes = Math.floor(seconds / 60);
+        return `Son kare ${minutes} dk once alindi.`;
+      }
+
+      class MjpegCard {
+        constructor(card) {
+          this.card = card;
+          this.url = card.dataset.streamUrl;
+          this.canvas = card.querySelector("[data-stream-canvas]");
+          this.context = this.canvas.getContext("2d", { alpha: false, desynchronized: true });
+          this.overlay = card.querySelector("[data-overlay]");
+          this.status = card.querySelector("[data-status]");
+          this.meta = card.querySelector("[data-meta]");
+
+          this.controller = null;
+          this.reader = null;
+          this.retryTimer = null;
+          this.renderTimer = null;
+          this.watchdogTimer = null;
+          this.metaTimer = null;
+          this.buffer = new Uint8Array(0);
+          this.startBoundary = null;
+          this.pendingBlob = null;
+          this.rendering = false;
+          this.hasFrame = false;
+          this.attemptId = 0;
+          this.lastActivityAt = 0;
+          this.lastFrameAt = 0;
+          this.lastPresentedAt = 0;
+          this.maxFps = 24;
+          this.minFrameInterval = 1000 / this.maxFps;
+          this.initialFrameTimeout = 20000;
+          this.liveFrameTimeout = 5000;
+        }
+
+        start() {
+          this.watchdogTimer = window.setInterval(() => this.checkHealth(), 1000);
+          this.metaTimer = window.setInterval(() => this.refreshMeta(), 1000);
+          this.connect("initial");
+        }
+
+        stop() {
+          window.clearInterval(this.watchdogTimer);
+          window.clearInterval(this.metaTimer);
+          window.clearTimeout(this.retryTimer);
+          window.clearTimeout(this.renderTimer);
+
+          if (this.reader) {
+            this.reader.cancel().catch(() => {});
+            this.reader = null;
+          }
+
+          if (this.controller) {
+            this.controller.abort();
+            this.controller = null;
+          }
+        }
+
+        async connect(reason) {
+          window.clearTimeout(this.retryTimer);
+
+          if (this.reader) {
+            this.reader.cancel().catch(() => {});
+            this.reader = null;
+          }
+
+          if (this.controller) {
+            this.controller.abort();
+          }
+
+          this.buffer = new Uint8Array(0);
+          this.startBoundary = null;
+          this.pendingBlob = null;
+          this.rendering = false;
+          window.clearTimeout(this.renderTimer);
+          this.renderTimer = null;
+
+          const attemptId = ++this.attemptId;
+          this.controller = new AbortController();
+          this.lastActivityAt = performance.now();
+
+          if (!this.hasFrame) {
+            this.setState("loading", "Baglanti kuruluyor...");
+          } else {
+            this.setState("reconnecting", "Akis yenileniyor...");
+          }
+
+          const requestUrl = new URL(this.url);
+          requestUrl.searchParams.set("_ts", String(Date.now()));
+
+          try {
+            const response = await fetch(requestUrl.toString(), {
+              mode: "cors",
+              cache: "no-store",
+              signal: this.controller.signal
+            });
+
+            if (!response.ok || !response.body) {
+              throw new Error(`Baglanti hatasi: ${response.status}`);
+            }
+
+            const boundary = this.extractBoundary(response.headers.get("content-type"));
+            if (!boundary) {
+              throw new Error("Akis siniri bulunamadi");
+            }
+
+            this.startBoundary = textEncoder.encode(`--${boundary}`);
+            this.reader = response.body.getReader();
+
+            while (attemptId === this.attemptId) {
+              const { done, value } = await this.reader.read();
+
+              if (done) {
+                throw new Error("Akis sonlandi");
+              }
+
+              if (!value || !value.length) {
+                continue;
+              }
+
+              this.lastActivityAt = performance.now();
+              this.buffer = concatBytes(this.buffer, value);
+              this.consumeBuffer(attemptId);
+            }
+          } catch (error) {
+            if (attemptId !== this.attemptId || error.name === "AbortError") {
+              return;
+            }
+
+            this.queueReconnect(error.message || "Baglanti yeniden kuruluyor", this.hasFrame ? 600 : 1000);
+          }
+        }
+
+        extractBoundary(contentType) {
+          const match = contentType && contentType.match(/boundary="?([^";]+)"?/i);
+          if (!match) {
+            return null;
+          }
+
+          return match[1].replace(/^--/, "");
+        }
+
+        consumeBuffer(attemptId) {
+          if (!this.startBoundary) {
+            return;
+          }
+
+          const firstBoundaryIndex = indexOfSequence(this.buffer, this.startBoundary);
+          if (firstBoundaryIndex === -1) {
+            if (this.buffer.length > 65536) {
+              this.buffer = this.buffer.slice(-65536);
+            }
+
+            return;
+          }
+
+          if (firstBoundaryIndex > 0) {
+            this.buffer = this.buffer.slice(firstBoundaryIndex);
+          }
+
+          while (true) {
+            const headerEndIndex = indexOfSequence(this.buffer, headerSeparator, this.startBoundary.length);
+            if (headerEndIndex === -1) {
+              break;
+            }
+
+            const headerBytes = trimCrlf(this.buffer.slice(this.startBoundary.length, headerEndIndex));
+            const contentLength = this.extractContentLength(headerBytes);
+            const frameStartIndex = headerEndIndex + headerSeparator.length;
+
+            if (contentLength === null) {
+              const nextBoundaryIndex = indexOfSequence(this.buffer, this.startBoundary, frameStartIndex);
+              if (nextBoundaryIndex === -1) {
+                break;
+              }
+
+              const part = this.buffer.slice(this.startBoundary.length, nextBoundaryIndex);
+              this.buffer = this.buffer.slice(nextBoundaryIndex);
+              this.consumePart(part, attemptId);
+              continue;
+            }
+
+            const frameEndIndex = frameStartIndex + contentLength;
+            if (this.buffer.length < frameEndIndex) {
+              break;
+            }
+
+            const frameBytes = this.buffer.slice(frameStartIndex, frameEndIndex);
+            this.buffer = this.buffer.slice(frameEndIndex);
+            this.consumeFrame(frameBytes, attemptId);
+          }
+        }
+
+        extractContentLength(headerBytes) {
+          if (!headerBytes.length) {
+            return null;
+          }
+
+          const headerText = decodeAscii(headerBytes);
+          const match = headerText.match(/content-length:\s*(\d+)/i);
+          if (!match) {
+            return null;
+          }
+
+          return Number.parseInt(match[1], 10);
+        }
+
+        consumePart(partBytes, attemptId) {
+          const normalized = trimCrlf(partBytes);
+          if (!normalized.length) {
+            return;
+          }
+
+          let frameBytes = normalized;
+          const headerEndIndex = indexOfSequence(normalized, headerSeparator);
+
+          if (headerEndIndex !== -1) {
+            frameBytes = trimCrlf(normalized.subarray(headerEndIndex + headerSeparator.length));
+          }
+
+          this.consumeFrame(frameBytes, attemptId);
+        }
+
+        consumeFrame(frameBytes, attemptId) {
+          if (!frameBytes.length) {
+            return;
+          }
+
+          const isJpeg =
+            frameBytes.length >= 4 &&
+            frameBytes[0] === 255 &&
+            frameBytes[1] === 216 &&
+            frameBytes[frameBytes.length - 2] === 255 &&
+            frameBytes[frameBytes.length - 1] === 217;
+
+          if (!isJpeg) {
+            return;
+          }
+
+          this.lastFrameAt = performance.now();
+          this.lastActivityAt = this.lastFrameAt;
+          this.hasFrame = true;
+          this.enqueueFrame(new Blob([frameBytes], { type: "image/jpeg" }), attemptId);
+        }
+
+        enqueueFrame(blob, attemptId) {
+          if (attemptId !== this.attemptId) {
+            return;
+          }
+
+          this.pendingBlob = blob;
+
+          if (this.rendering || this.renderTimer) {
+            return;
+          }
+
+          this.flushPendingFrame(attemptId);
+        }
+
+        flushPendingFrame(attemptId) {
+          if (attemptId !== this.attemptId || this.rendering || !this.pendingBlob) {
+            return;
+          }
+
+          const elapsed = performance.now() - this.lastPresentedAt;
+          const delay = Math.max(0, this.minFrameInterval - elapsed);
+
+          if (delay > 0) {
+            this.renderTimer = window.setTimeout(() => {
+              this.renderTimer = null;
+              this.flushPendingFrame(attemptId);
+            }, delay);
+            return;
+          }
+
+          const nextBlob = this.pendingBlob;
+          this.pendingBlob = null;
+          this.renderBlob(nextBlob, attemptId);
+        }
+
+        renderBlob(blob, attemptId) {
+          this.rendering = true;
+          this.decodeAndDraw(blob, attemptId);
+        }
+
+        async decodeAndDraw(blob, attemptId) {
+          let bitmap = null;
+
+          try {
+            bitmap = await createImageBitmap(blob);
+          } catch (error) {
+            closeBitmap(bitmap);
+            this.finishRender(attemptId);
+            return;
+          }
+
+          if (attemptId !== this.attemptId) {
+            closeBitmap(bitmap);
+            this.finishRender(attemptId);
+            return;
+          }
+
+          window.requestAnimationFrame(() => {
+            if (attemptId !== this.attemptId) {
+              closeBitmap(bitmap);
+              this.finishRender(attemptId);
+              return;
+            }
+
+            try {
+              this.drawBitmapToCanvas(bitmap);
+              this.lastPresentedAt = performance.now();
+              this.card.classList.add("has-frame");
+              this.setState("live", "Canli akis suruyor.");
+              this.overlay.classList.add("is-hidden");
+            } finally {
+              closeBitmap(bitmap);
+              this.finishRender(attemptId);
+            }
+          });
+        }
+
+        drawBitmapToCanvas(bitmap) {
+          const rect = this.canvas.getBoundingClientRect();
+          const cssWidth = Math.max(1, Math.round(rect.width));
+          const cssHeight = Math.max(1, Math.round(rect.height));
+          const pixelRatio = Math.max(1, window.devicePixelRatio || 1);
+          const targetWidth = Math.max(1, Math.round(cssWidth * pixelRatio));
+          const targetHeight = Math.max(1, Math.round(cssHeight * pixelRatio));
+
+          if (this.canvas.width !== targetWidth || this.canvas.height !== targetHeight) {
+            this.canvas.width = targetWidth;
+            this.canvas.height = targetHeight;
+          }
+
+          const sourceWidth = bitmap.width;
+          const sourceHeight = bitmap.height;
+          const sourceRatio = sourceWidth / sourceHeight;
+          const targetRatio = targetWidth / targetHeight;
+
+          let sx = 0;
+          let sy = 0;
+          let sw = sourceWidth;
+          let sh = sourceHeight;
+
+          if (sourceRatio > targetRatio) {
+            sw = sourceHeight * targetRatio;
+            sx = (sourceWidth - sw) / 2;
+          } else if (sourceRatio < targetRatio) {
+            sh = sourceWidth / targetRatio;
+            sy = (sourceHeight - sh) / 2;
+          }
+
+          this.context.imageSmoothingEnabled = true;
+          this.context.drawImage(bitmap, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
+        }
+
+        finishRender(attemptId) {
+          this.rendering = false;
+
+          if (attemptId !== this.attemptId) {
+            this.pendingBlob = null;
+            return;
+          }
+
+          this.flushPendingFrame(attemptId);
+        }
+
+        checkHealth() {
+          if (!this.controller) {
+            return;
+          }
+
+          const timeout = this.hasFrame ? this.liveFrameTimeout : this.initialFrameTimeout;
+
+          if (performance.now() - this.lastActivityAt > timeout) {
+            const message = this.hasFrame
+              ? "Akis 5 sn boyunca durdu, yenileniyor..."
+              : "Akis beklenenden gec geliyor, baglanti yenileniyor...";
+            this.queueReconnect(message, this.hasFrame ? 150 : 1000);
+          }
+        }
+
+        queueReconnect(message, delay) {
+          window.clearTimeout(this.retryTimer);
+          this.setState(this.hasFrame ? "reconnecting" : "loading", message);
+          this.retryTimer = window.setTimeout(() => this.connect("retry"), delay);
+        }
+
+        refreshMeta() {
+          if (!this.hasFrame || this.status.dataset.state !== "live") {
+            return;
+          }
+
+          const seconds = Math.max(0, Math.floor((performance.now() - this.lastFrameAt) / 1000));
+          this.meta.textContent = formatAgo(seconds);
+        }
+
+        setState(state, metaText) {
+          this.status.dataset.state = state;
+
+          if (state === "live") {
+            this.status.textContent = "Canli";
+            this.overlay.classList.add("is-hidden");
+          } else if (state === "reconnecting") {
+            this.status.textContent = "Yenileniyor";
+            if (!this.hasFrame) {
+              this.overlay.classList.remove("is-hidden");
+            }
+          } else {
+            this.status.textContent = "Yukleniyor";
+            this.overlay.classList.remove("is-hidden");
+          }
+
+          const overlayText = state === "reconnecting" && this.hasFrame ? "Akis yenileniyor" : "Yukleniyor";
+          this.overlay.querySelector("span").textContent = overlayText;
+          this.meta.textContent = metaText;
+        }
+      }
+
+      const cards = Array.from(document.querySelectorAll("[data-stream-card]"));
+      const players = cards.map((card) => new MjpegCard(card));
+
+      players.forEach((player) => player.start());
+
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+          players.forEach((player) => player.queueReconnect("Sekme yeniden etkin, akis tazeleniyor...", 100));
+        }
+      });
+
+      window.addEventListener("beforeunload", () => {
+        players.forEach((player) => player.stop());
+      });
+    </script>
+  </body>
+</html>
