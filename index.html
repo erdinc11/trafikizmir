@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
     />
-    <title>Izmir Canli Trafik Izleme2</title>
+    <title>Izmir Canli Trafik Izleme</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -263,6 +263,27 @@
         pointer-events: none;
       }
 
+      .stream-native-image {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: cover;
+        transform: translateZ(0) scale(1.01);
+        backface-visibility: hidden;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .camera-card.is-native-active .stream-canvas {
+        opacity: 0;
+      }
+
+      .camera-card.is-native-active .stream-native-image {
+        opacity: 1;
+      }
+
       .stream-overlay {
         position: absolute;
         inset: 0;
@@ -435,7 +456,7 @@
         <div class="hero-kicker">Canli Akis</div>
         <h1>
           <span>Izmir MOBESE</span>
-          <span>Mobil Izleme Paneli2</span>
+          <span>Mobil Izleme Paneli3</span>
         </h1>
         <p>
           Akislar sayfa acilir acilmaz calisir. Bir kamera 5 saniye boyunca veri akitmazsa sadece o
@@ -464,6 +485,11 @@
               role="img"
               aria-label="Anadolu Caddesi canli kamera goruntusu"
             ></canvas>
+            <img
+              class="stream-native-image"
+              data-stream-native-image
+              alt="Anadolu Caddesi canli kamera goruntusu"
+            />
             <div class="stream-overlay" data-overlay>
               <span>Yukleniyor</span>
             </div>
@@ -495,6 +521,11 @@
               role="img"
               aria-label="Ordu Bulvari canli kamera goruntusu"
             ></canvas>
+            <img
+              class="stream-native-image"
+              data-stream-native-image
+              alt="Ordu Bulvari canli kamera goruntusu"
+            />
             <div class="stream-overlay" data-overlay>
               <span>Yukleniyor</span>
             </div>
@@ -573,6 +604,10 @@
         return isAppleMobileDevice;
       }
 
+      function prefersNativeMjpeg() {
+        return prefersImageDecoder();
+      }
+
       function getSourceWidth(source) {
         return source.width || source.videoWidth || source.naturalWidth || 0;
       }
@@ -599,6 +634,7 @@
           this.card = card;
           this.url = card.dataset.streamUrl;
           this.canvas = card.querySelector("[data-stream-canvas]");
+          this.nativeImage = card.querySelector("[data-stream-native-image]");
           this.context = this.canvas.getContext("2d", { alpha: false }) || this.canvas.getContext("2d");
           this.overlay = card.querySelector("[data-overlay]");
           this.status = card.querySelector("[data-status]");
@@ -625,9 +661,19 @@
           this.liveFrameTimeout = 5000;
           this.decoderMode = prefersImageDecoder() ? "image" : "bitmap";
           this.decodeFailureCount = 0;
+          this.renderMode = prefersNativeMjpeg() ? "native-mjpeg" : "canvas-mjpeg";
+          this.nativeFrameTimer = null;
+          this.nativePollTimer = null;
+          this.boundNativeLoad = () => this.handleNativeImageReady();
+          this.boundNativeError = () => this.handleNativeImageError();
         }
 
         start() {
+          if (this.renderMode === "native-mjpeg") {
+            this.startNativeStream();
+            return;
+          }
+
           this.watchdogTimer = window.setInterval(() => this.checkHealth(), 1000);
           this.metaTimer = window.setInterval(() => this.refreshMeta(), 1000);
           this.connect("initial");
@@ -638,6 +684,8 @@
           window.clearInterval(this.metaTimer);
           window.clearTimeout(this.retryTimer);
           window.clearTimeout(this.renderTimer);
+          window.clearTimeout(this.nativeFrameTimer);
+          window.clearTimeout(this.nativePollTimer);
 
           if (this.reader) {
             this.reader.cancel().catch(() => {});
@@ -648,9 +696,20 @@
             this.controller.abort();
             this.controller = null;
           }
+
+          if (this.nativeImage) {
+            this.nativeImage.onload = null;
+            this.nativeImage.onerror = null;
+            this.nativeImage.removeAttribute("src");
+          }
         }
 
         async connect(reason) {
+          if (this.renderMode === "native-mjpeg") {
+            this.startNativeStream(reason);
+            return;
+          }
+
           window.clearTimeout(this.retryTimer);
 
           if (this.reader) {
@@ -723,6 +782,70 @@
 
             this.queueReconnect(error.message || "Baglanti yeniden kuruluyor", this.hasFrame ? 600 : 1000);
           }
+        }
+
+        startNativeStream(reason = "initial") {
+          window.clearTimeout(this.retryTimer);
+          window.clearTimeout(this.nativeFrameTimer);
+          window.clearTimeout(this.nativePollTimer);
+
+          this.card.classList.add("is-native-active");
+          this.card.classList.remove("has-frame");
+          this.hasFrame = false;
+          this.lastActivityAt = performance.now();
+
+          if (reason === "retry") {
+            this.setState("loading", "Baglanti kuruluyor...");
+          } else {
+            this.setState("loading", "Baglanti kuruluyor...");
+          }
+
+          if (!this.nativeImage) {
+            this.meta.textContent = "Kamera gosterilemiyor.";
+            return;
+          }
+
+          this.nativeImage.onload = this.boundNativeLoad;
+          this.nativeImage.onerror = this.boundNativeError;
+          this.nativeImage.src = this.buildStreamUrl();
+          this.scheduleNativeFramePoll();
+        }
+
+        buildStreamUrl() {
+          const requestUrl = new URL(this.url);
+          requestUrl.searchParams.set("_ts", String(Date.now()));
+          return requestUrl.toString();
+        }
+
+        scheduleNativeFramePoll() {
+          window.clearTimeout(this.nativePollTimer);
+          this.nativePollTimer = window.setTimeout(() => {
+            this.nativePollTimer = null;
+            this.handleNativeImageReady();
+          }, 500);
+        }
+
+        handleNativeImageReady() {
+          if (!this.nativeImage || !this.nativeImage.complete || this.nativeImage.naturalWidth <= 0) {
+            this.scheduleNativeFramePoll();
+            return;
+          }
+
+          window.clearTimeout(this.nativePollTimer);
+          this.nativePollTimer = null;
+          this.lastFrameAt = performance.now();
+          this.lastActivityAt = this.lastFrameAt;
+          this.hasFrame = true;
+          this.card.classList.add("has-frame");
+          this.setState("live", "Canli akis suruyor.");
+          this.overlay.classList.add("is-hidden");
+        }
+
+        handleNativeImageError() {
+          window.clearTimeout(this.nativePollTimer);
+          this.setState("loading", "Baglanti kuruluyor...");
+          this.meta.textContent = "Akis yeniden aciliyor...";
+          this.retryTimer = window.setTimeout(() => this.startNativeStream("retry"), 800);
         }
 
         extractBoundary(contentType) {
@@ -1075,6 +1198,10 @@
         }
 
         checkHealth() {
+          if (this.renderMode !== "canvas-mjpeg") {
+            return;
+          }
+
           if (!this.controller) {
             return;
           }
@@ -1090,6 +1217,13 @@
         }
 
         queueReconnect(message, delay) {
+          if (this.renderMode === "native-mjpeg") {
+            window.clearTimeout(this.retryTimer);
+            this.setState("loading", message);
+            this.retryTimer = window.setTimeout(() => this.startNativeStream("retry"), delay);
+            return;
+          }
+
           window.clearTimeout(this.retryTimer);
           this.setState(this.hasFrame ? "reconnecting" : "loading", message);
           this.retryTimer = window.setTimeout(() => this.connect("retry"), delay);
